@@ -1,0 +1,206 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+Survey data typically come in the form of likert 5 and 7 point scales and are categorical in nature. This limits analysis to $\chi^2$ analysis, Fischer's exact test and conversion of the categorical scales to numeric values and a t-test analysis. The former doesn't lead to understanding of pairwise differences and the latter isn't faithful to the categorical nature of the variables.
+
+# Proposal
+
+Use Bayesian analysis and count data in order to understand the differences in the data.
+
+# Method
+
+Generate some fake survey data, pass through a Binomial liklihood with a Beta prior. Summarise the posteriors to understand the differences.
+
+## Fake Data
+
+```{r fake_data}
+set.seed(336)
+
+questions <- factor(
+  c("Strongly agree", "Agree", "Neither", "Disagree", "Strongly Disagree"),
+  c("Strongly Disagree", "Disagree", "Neither", "Agree", "Strongly agree"))
+
+# Establish the vectors of probabilties
+p1 <- c(.25, .25, .05, .30, .15)
+p2 <-c(.25, .20, .02, .33, .20)
+
+group_1 <- rbinom(5, 100, p1)+rbinom(5,5,.25)
+group_2 <- rbinom(5, 100, p2)++rbinom(5,5,.25)
+
+df <- data.frame(questions, group_1, group_2)
+
+knitr::kable(df)
+```
+
+## Frequentist method
+
+For comparison:
+
+```{r}
+chisq.test(df$group_1, df$group_2)
+```
+
+Results are not significant, these two distributions are drawn from the same distribution...so the frequentist analysis indicates.
+
+## Posterior Draws
+
+Set up for the Bayesian analysis
+
+```{r}
+#Prep for MC
+group_1_n <- sum(group_1)
+group_2_n <- sum(group_2)
+
+#Priors
+a <- .1
+b <- .1
+
+#Iterations
+sampz <- 100000
+
+#Draw from posterior
+group_1_posterior <-list()
+for(i in 1:length(group_1)){
+  group_1_posterior[[i]] <- rbeta(sampz,group_1[i]+a,group_1_n-group_1[i]+b)
+  
+}
+
+group_2_posterior <-list()
+for(i in 1:length(group_2)){
+  group_2_posterior[[i]] <- rbeta(sampz,group_2[i]+a,group_2_n-group_2[i]+b)
+  
+}
+```
+
+## Examine Posterior Distribution
+
+```{r echo=FALSE}
+par(mfrow = c(5,2), mar = c(.1,.1,.1,.1))
+hist(group_1_posterior[[1]], breaks =60, main = "Group 1-Strongly agree", 
+     xlim = c(0,.5))
+abline(v = mean(group_1_posterior[[1]]), col = "red")
+hist(group_2_posterior[[1]], breaks =60, main = "Group 2-Strongly agree", 
+     xlim = c(0,.5))
+abline(v = mean(group_2_posterior[[1]]), col = "red")
+
+hist(group_1_posterior[[2]], breaks =60, main = "Group 1-Agree", 
+     xlim = c(0,.5))
+abline(v = mean(group_1_posterior[[2]]), col = "red")
+hist(group_2_posterior[[2]], breaks =60, main = "Group 2-Agree", 
+     xlim = c(0,.5))
+abline(v = mean(group_2_posterior[[2]]), col = "red")
+
+hist(group_1_posterior[[3]], breaks =60, main = "Group 1-Neither", 
+     xlim = c(0,.5))
+abline(v = mean(group_1_posterior[[3]]), col = "red")
+hist(group_2_posterior[[3]], breaks =60, main = "Group 2-Neither", 
+     xlim = c(0,.5))
+abline(v = mean(group_2_posterior[[3]]), col = "red")
+
+hist(group_1_posterior[[4]], breaks =60, main = "Group 1-Disagree", 
+     xlim = c(0,.5))
+abline(v = mean(group_1_posterior[[4]]), col = "red")
+hist(group_2_posterior[[4]], breaks =60, main = "Group 2-Disagree", 
+     xlim = c(0,.5))
+abline(v = mean(group_2_posterior[[4]]), col = "red")
+
+hist(group_1_posterior[[5]], breaks =60, main = "Group 1-Strongly Disagree", 
+     xlim = c(0,.5))
+abline(v = mean(group_1_posterior[[5]]), col = "red")
+hist(group_2_posterior[[5]], breaks =60, main = "Group 2-Strongly Disagree", 
+     xlim = c(0,.5))
+abline(v = mean(group_2_posterior[[5]]), col = "red")
+
+
+```
+
+```{r}
+# library(tidyverse)
+# #name my lists
+# try_1<-list()
+# for(i in 1:5){
+#   catz <- rep(as.character(questions[i]),sampz)
+#   try_1[[i]] <- group_1_posterior[[i]] %>% 
+#     as_data_frame() %>% 
+#     add_column(., catz)
+# }
+# 
+# try_2<-list()
+# for(i in 1:5){
+#   catz <- rep(as.character(questions[i]),sampz)
+#   try_2[[i]] <- group_2_posterior[[i]] %>% 
+#     as_data_frame() %>% 
+#     add_column(., catz)
+# }
+```
+
+
+```{r eval=FALSE}
+# library(ggplot2)
+# library(dplyr)
+# try_1 %>% 
+#   bind_rows() %>% 
+#   mutate(group = "group_1") %>% 
+#   union(., try_2 %>% 
+#   bind_rows() %>% 
+#   mutate(group = "group_2")) %>% 
+#   ggplot(aes(value, color = group, group = group))+
+#   geom_density()+
+#   facet_wrap(~catz)+theme_minimal()
+```
+
+
+## Summarise Results
+
+First, I need a helper function to summarise the two different groups.
+
+```{r}
+#Helper Function
+library(purrr)
+
+summarise_posterior <- function(x,y){
+  mu_1 <- map_dbl(x, mean)
+  mu_2 <- map_dbl(y, mean)
+  
+  sd_1 <- map_dbl(x, sd)
+  sd_2 <- map_dbl(y, sd)
+  
+  delta_<-list()
+  pooled_sd <- list()
+  pro_difference <-vector()
+  for(i in 1:length(x)){
+    delta_[[i]] <- x[[i]]-y[[i]]
+    delta_mu <- map_dbl(delta_, mean)
+    pooled_sd[[i]] <-sqrt(var(x[[i]]) + var(y[[i]]))
+    cohens <-delta_mu/ unlist(pooled_sd)
+    pro_difference[i] <- max(mean(x[[i]] > y[[i]]), 
+                          1-mean(x[[i]] > y[[i]]))
+  }
+  
+  out <- cbind(mu_1, mu_2, sd_1, sd_2,delta_mu, cohens,pro_difference)
+  
+  out
+}
+
+```
+
+
+Now look at the results in table form.
+
+```{r}
+statz <- summarise_posterior(group_1_posterior, group_2_posterior)
+
+knitr::kable(cbind(statz, p1, p2 ), digits = 3)
+```
+
+# Summary
+
+Now we can look at the individual differences as well as the individual propabilties of difference.
