@@ -52,6 +52,16 @@ Results are not significant, these two distributions are drawn from the same dis
 
 ## Posterior Draws
 
+The Bayesian Analysis will take the following form:
+Liklihood:
+
+$$Y|\theta \sim Binomial(N, \theta)$$
+Prior
+$$\theta \sim Beta(a,b)$$
+Posterior:
+$$\theta | Y \sim beta(Y +a, N- Y +b)$$
+Where a = 0.1, b = 0.1, Y is number of positive reponses for the question and N is the total number of responses.
+
 Set up for the Bayesian analysis
 
 ```{r}
@@ -122,39 +132,40 @@ abline(v = mean(group_2_posterior[[5]]), col = "red")
 
 ```
 
-```{r}
-# library(tidyverse)
-# #name my lists
-# try_1<-list()
-# for(i in 1:5){
-#   catz <- rep(as.character(questions[i]),sampz)
-#   try_1[[i]] <- group_1_posterior[[i]] %>% 
-#     as_data_frame() %>% 
-#     add_column(., catz)
-# }
-# 
-# try_2<-list()
-# for(i in 1:5){
-#   catz <- rep(as.character(questions[i]),sampz)
-#   try_2[[i]] <- group_2_posterior[[i]] %>% 
-#     as_data_frame() %>% 
-#     add_column(., catz)
-# }
+```{r echo=FALSE}
+suppressPackageStartupMessages(library(tidyverse))
+#name my lists
+try_1<-list()
+for(i in 1:5){
+  catz <- rep(as.character(questions[i]),sampz)
+  try_1[[i]] <- group_1_posterior[[i]] %>%
+    as_data_frame() %>%
+    add_column(., catz)
+}
+
+try_2<-list()
+for(i in 1:5){
+  catz <- rep(as.character(questions[i]),sampz)
+  try_2[[i]] <- group_2_posterior[[i]] %>%
+    as_data_frame() %>%
+    add_column(., catz)
+}
 ```
 
 
-```{r eval=FALSE}
-# library(ggplot2)
-# library(dplyr)
-# try_1 %>% 
-#   bind_rows() %>% 
-#   mutate(group = "group_1") %>% 
-#   union(., try_2 %>% 
-#   bind_rows() %>% 
-#   mutate(group = "group_2")) %>% 
-#   ggplot(aes(value, color = group, group = group))+
-#   geom_density()+
-#   facet_wrap(~catz)+theme_minimal()
+```{r echo=FALSE}
+library(ggplot2)
+library(dplyr)
+try_1 %>%
+  bind_rows() %>%
+  mutate(group = "group_1") %>%
+  union(., try_2 %>%
+  bind_rows() %>% 
+  mutate(group = "group_2")) %>%
+  mutate(catz = factor(catz, c("Strongly Disagree", "Disagree", "Neither", "Agree", "Strongly agree"))) %>% 
+  ggplot(aes(value, color = group, group = group))+
+  geom_density()+
+  facet_wrap(~catz)+theme_minimal()
 ```
 
 
@@ -195,12 +206,49 @@ summarise_posterior <- function(x,y){
 
 Now look at the results in table form.
 
-```{r}
+```{r echo=FALSE}
 statz <- summarise_posterior(group_1_posterior, group_2_posterior)
 
-knitr::kable(cbind(statz, p1, p2 ), digits = 3)
+knitr::kable(data.frame(question =as.character(questions),statz, p1, p2 ), digits = 3)
 ```
 
 # Summary
 
 Now we can look at the individual differences as well as the individual propabilties of difference.
+
+# Power Analysis
+
+```{r}
+
+group_1_success <- 1
+
+group_2_success <- 5
+
+
+a_A <- group_1_success+1
+b_A <- group_1_n-group_1_success+1
+a_B <- group_2_success+1
+b_B <- group_2_n-group_2_success+1
+
+fun <- function(i) exp(lbeta(a_A+i, b_B+b_A)
+             - log(b_B+i)
+             - lbeta(1+i, b_B)
+             - lbeta(a_A, b_A))
+
+sum(vapply(0:(a_B-1), fun, numeric(1)))
+```
+
+
+#Frequentist Power Calculations
+
+```{r}
+p <- 0.25 #Treatment Group
+p0 <- 0.15
+alpha <- 0.1 # Type
+beta <- 0.2 # Power
+(n=p*(1-p)*((qnorm(1-alpha/2)+qnorm(1-beta))/(p-p0))^2)
+ceiling(n) # 50
+z=(p-p0)/sqrt(p*(1-p)/n)
+(Power=pnorm(z-qnorm(1-alpha/2))+pnorm(-z-qnorm(1-alpha/2)))
+```
+
