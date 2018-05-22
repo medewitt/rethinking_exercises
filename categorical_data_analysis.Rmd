@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "Bayesian Analysis of Likert Categorical Responses"
 output: pdf_document
 ---
 
@@ -53,13 +53,14 @@ Results are not significant, these two distributions are drawn from the same dis
 ## Posterior Draws
 
 The Bayesian Analysis will take the following form:
+
 Liklihood:
 
 $$Y|\theta \sim Binomial(N, \theta)$$
 Prior
 $$\theta \sim Beta(a,b)$$
 Posterior:
-$$\theta | Y \sim beta(Y +a, N- Y +b)$$
+$$\theta | Y \sim Beta(Y +a, N- Y +b)$$
 Where a = 0.1, b = 0.1, Y is number of positive reponses for the question and N is the total number of responses.
 
 Set up for the Bayesian analysis
