@@ -22,3 +22,4 @@ curve(dbeta(x, w+1, n-w+1), from = 0, to = 1)
 
 #Quadratic Approximaton
 curve(dnorm(x, 0.67, .016), lty = 2, add= TRUE)
+
